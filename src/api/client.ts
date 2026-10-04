@@ -1,13 +1,5 @@
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? '';
 
-export type EnvironmentScore = {
-  id: number;
-  name: string;
-  slug: string;
-  score: number;
-  confidence_percent: number;
-};
-
 export type PoseMatch = {
   id: number;
   category_id: number;
@@ -22,13 +14,6 @@ export type PoseMatch = {
   similarity: number | null;
 };
 
-export type MatchImageResponse = {
-  detected_environment: EnvironmentScore | null;
-  detected_gender: string | null;
-  environments: EnvironmentScore[];
-  matches: PoseMatch[];
-};
-
 /** Backend serves pose/skeleton images as relative paths through its `/snappose/*` MinIO proxy. */
 export function resolveMediaUrl(path: string): string {
   if (!path) return path;
@@ -36,31 +21,28 @@ export function resolveMediaUrl(path: string): string {
   return `${API_BASE_URL}${path.startsWith('/') ? '' : '/'}${path}`;
 }
 
-export async function matchImageFile(fileUri: string, topK = 10): Promise<MatchImageResponse> {
+async function postBase64<T>(endpoint: string, base64: string, topK: number): Promise<T> {
   if (!API_BASE_URL) {
     throw new Error(
       'EXPO_PUBLIC_API_URL is not set — put your ngrok URL in .env, see plan/02-repo-and-env-setup.md',
     );
   }
 
-  const form = new FormData();
-  form.append('file', {
-    uri: fileUri,
-    name: 'photo.jpg',
-    type: 'image/jpeg',
-  } as unknown as Blob);
-  form.append('top_k', String(topK));
-
-  const res = await fetch(`${API_BASE_URL}/api/match-image-file`, {
+  const res = await fetch(`${API_BASE_URL}/api/${endpoint}`, {
     method: 'POST',
-    body: form,
-    headers: { Accept: 'application/json' },
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ image: `data:image/jpeg;base64,${base64}`, top_k: topK }),
   });
 
   if (!res.ok) {
     const detail = await res.text().catch(() => '');
-    throw new Error(`match-image-file failed (${res.status}): ${detail}`);
+    throw new Error(`${endpoint} failed (${res.status}): ${detail}`);
   }
 
-  return res.json();
+  return (await res.json()) as T;
+}
+
+/** Mirrors the web camera flow: send a captured data URL to the pose suggestion endpoint. */
+export function suggestPoseFromImage(base64: string, topK = 5): Promise<PoseMatch[]> {
+  return postBase64<PoseMatch[]>('suggest-pose', base64, topK);
 }

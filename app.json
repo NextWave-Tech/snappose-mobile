@@ -37,6 +37,14 @@
         }
       ],
       [
+        "expo-media-library",
+        {
+          "photosPermission": "SnapPose cần quyền truy cập ảnh để xem lại các ảnh bạn đã chụp.",
+          "savePhotosPermission": "SnapPose cần quyền lưu ảnh bạn chụp vào thư viện ảnh.",
+          "isAccessMediaLocationEnabled": false
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "backgroundColor": "#208AEF",

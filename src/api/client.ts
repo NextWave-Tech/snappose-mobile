@@ -21,7 +21,25 @@ export function resolveMediaUrl(path: string): string {
   return `${API_BASE_URL}${path.startsWith('/') ? '' : '/'}${path}`;
 }
 
-async function postBase64<T>(endpoint: string, base64: string, topK: number): Promise<T> {
+export type Scene = {
+  id: number;
+  name: string;
+  slug: string;
+  score: number;
+  confidence_percent: number;
+};
+
+export type PoseBatch = {
+  /** Null when no category has enough poses and the server fell back to random poses. */
+  scene: Scene | null;
+  /** Gender detected in the frame ('nam' | 'nu'); poses are filtered by it. */
+  detected_gender: string | null;
+  /** True when the scene ran out of unseen poses and the list restarted from the best matches. */
+  reset: boolean;
+  matches: PoseMatch[];
+};
+
+async function postJson<T>(endpoint: string, body: Record<string, unknown>): Promise<T> {
   if (!API_BASE_URL) {
     throw new Error(
       'EXPO_PUBLIC_API_URL is not set — put your ngrok URL in .env, see plan/02-repo-and-env-setup.md',
@@ -31,7 +49,7 @@ async function postBase64<T>(endpoint: string, base64: string, topK: number): Pr
   const res = await fetch(`${API_BASE_URL}/api/${endpoint}`, {
     method: 'POST',
     headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
-    body: JSON.stringify({ image: `data:image/jpeg;base64,${base64}`, top_k: topK }),
+    body: JSON.stringify(body),
   });
 
   if (!res.ok) {
@@ -42,7 +60,19 @@ async function postBase64<T>(endpoint: string, base64: string, topK: number): Pr
   return (await res.json()) as T;
 }
 
-/** Mirrors the web camera flow: send a captured data URL to the pose suggestion endpoint. */
-export function suggestPoseFromImage(base64: string, topK = 5): Promise<PoseMatch[]> {
-  return postBase64<PoseMatch[]>('suggest-pose', base64, topK);
+/**
+ * Detects the scene in a captured frame and returns the next batch of poses for it.
+ * Pass the ids already shown for the current scene as `excludeIds` to page forward.
+ * Selfie poses are only offered when `facing` is `'front'`.
+ */
+export function suggestPoseBatch(
+  base64: string,
+  excludeIds: number[],
+  facing: 'front' | 'back',
+): Promise<PoseBatch> {
+  return postJson<PoseBatch>('suggest-poses', {
+    image: `data:image/jpeg;base64,${base64}`,
+    exclude_ids: excludeIds,
+    facing,
+  });
 }

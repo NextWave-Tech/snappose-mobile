@@ -1,10 +1,17 @@
-import { CameraType, CameraView, useCameraPermissions } from 'expo-camera';
-import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useRef, useState } from 'react';
+import { router, useFocusEffect, useIsFocused } from 'expo-router';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { Pressable, StatusBar, StyleSheet, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+  Camera,
+  useCameraDevice,
+  useCameraPermission,
+  usePhotoOutput,
+  type CameraRef,
+} from 'react-native-vision-camera';
 
-import { CameraControls, ZoomSelector } from '@/components/camera-controls';
+import { BACK_CAMERA_LENSES, captureFrameBase64, toFileUri } from '@/camera/vision';
+import { CameraControls, ZoomIndicator } from '@/components/camera-controls';
 import { PhotoPreview } from '@/components/photo-preview';
 import { PoseOverlay } from '@/components/pose-overlay';
 import { PoseStrip } from '@/components/pose-strip';
@@ -13,26 +20,21 @@ import { palette } from '@/constants/palette';
 import { usePoseSuggestions, type Notice } from '@/hooks/use-pose-suggestions';
 import { listPhotos, savePhoto } from '@/storage/photos';
 
-/**
- * `zoom` is a 0–1 fraction of the device's maximum zoom, so 2x is only approximate and varies
- * per phone. Tune the 2x value on a real device.
- */
-const ZOOM_LEVELS = [
-  { label: '1x', value: 0 },
-  { label: '2x', value: 0.25 },
-] as const;
 const GENDER_LABELS: Record<string, string> = { nam: 'Nam', nu: 'Nữ' };
 
 export default function CameraScreen() {
-  const [permission, requestPermission] = useCameraPermissions();
-  const [facing, setFacing] = useState<CameraType>('back');
-  const [zoom, setZoom] = useState<number>(ZOOM_LEVELS[0].value);
+  const { hasPermission, requestPermission } = useCameraPermission();
+  const [facing, setFacing] = useState<'front' | 'back'>('back');
+  const device = useCameraDevice(facing, facing === 'back' ? { physicalDevices: BACK_CAMERA_LENSES } : undefined);
+  const photoOutput = usePhotoOutput({ quality: 0.9 });
+  const outputs = useMemo(() => [photoOutput], [photoOutput]);
+  const isFocused = useIsFocused();
   const [cameraReady, setCameraReady] = useState(false);
   const [capturing, setCapturing] = useState(false);
   const [notice, setNotice] = useState<Notice | null>(null);
   const [captured, setCaptured] = useState<{ uri: string; status: string } | null>(null);
   const [latestPhotoUri, setLatestPhotoUri] = useState<string | null>(null);
-  const cameraRef = useRef<CameraView>(null);
+  const cameraRef = useRef<CameraRef>(null);
   const insets = useSafeAreaInsets();
   const suggestions = usePoseSuggestions(setNotice);
 
@@ -43,15 +45,15 @@ export default function CameraScreen() {
   );
 
   const takePicture = useCallback(async () => {
-    if (!cameraRef.current || !cameraReady || capturing) return;
+    if (!cameraReady || capturing) return;
     setCapturing(true);
     setNotice(null);
     try {
-      const photo = await cameraRef.current.takePictureAsync({ quality: 0.85 });
-      if (!photo?.uri) throw new Error();
-      let shown = { uri: photo.uri, status: 'Chưa lưu được ảnh' };
+      const photo = await photoOutput.capturePhotoToFile({ enableShutterSound: false }, {});
+      const uri = toFileUri(photo.filePath);
+      let shown = { uri, status: 'Chưa lưu được ảnh' };
       try {
-        const saved = await savePhoto(photo.uri);
+        const saved = await savePhoto(uri);
         setLatestPhotoUri(saved.uri);
         shown = {
           uri: saved.uri,
@@ -67,17 +69,20 @@ export default function CameraScreen() {
     } finally {
       setCapturing(false);
     }
-  }, [cameraReady, capturing]);
+  }, [cameraReady, capturing, photoOutput]);
 
-  if (!permission) return <View style={styles.screen} />;
+  const captureFrame = useCallback(() => {
+    if (!cameraRef.current) return Promise.reject(new Error('Camera chưa sẵn sàng. Thử lại nhé.'));
+    return captureFrameBase64(cameraRef.current);
+  }, []);
 
-  if (!permission.granted) {
+  if (!hasPermission) {
     return (
-      <SafeAreaView style={[styles.screen, styles.permission]}>
+      <SafeAreaView style={[styles.screen, styles.centered]}>
         <StatusBar barStyle="light-content" />
         <ThemedText type="title" style={styles.brand}>SnapPose</ThemedText>
-        <ThemedText style={styles.permissionText}>Bật camera để thử pose ngay trên khung hình.</ThemedText>
-        <Pressable style={styles.permissionButton} onPress={requestPermission}>
+        <ThemedText style={styles.mutedText}>Bật camera để thử pose ngay trên khung hình.</ThemedText>
+        <Pressable style={styles.permissionButton} onPress={() => void requestPermission()}>
           <ThemedText type="smallBold" style={styles.permissionButtonText}>Cho phép camera</ThemedText>
         </Pressable>
       </SafeAreaView>
@@ -86,6 +91,14 @@ export default function CameraScreen() {
 
   if (captured) {
     return <PhotoPreview uri={captured.uri} status={captured.status} onRetake={() => setCaptured(null)} />;
+  }
+
+  if (!device) {
+    return (
+      <SafeAreaView style={[styles.screen, styles.centered]}>
+        <ThemedText style={styles.mutedText}>Không tìm thấy camera trên máy này.</ThemedText>
+      </SafeAreaView>
+    );
   }
 
   const { poses, selectedPose, scene, gender, suggesting } = suggestions;
@@ -98,15 +111,20 @@ export default function CameraScreen() {
   return (
     <View style={styles.screen}>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
-      <CameraView
+      <Camera
         ref={cameraRef}
         style={StyleSheet.absoluteFill}
-        facing={facing}
-        zoom={zoom}
-        // The pink button grabs a frame with takePictureAsync too; the built-in shutter flash
-        // made every AI request look like a photo was taken.
-        animateShutter={false}
-        onCameraReady={() => setCameraReady(true)}
+        device={device}
+        isActive={isFocused}
+        outputs={outputs}
+        // Pinch to zoom across the device's whole range; on multi-lens phones going below 1x
+        // switches to the ultra-wide lens.
+        enableNativeZoomGesture
+        // Always open on the main lens (1x), not the ultra-wide.
+        getInitialZoom={() => 1}
+        onStarted={() => setCameraReady(true)}
+        onStopped={() => setCameraReady(false)}
+        onError={() => setNotice({ tone: 'error', text: 'Camera gặp lỗi. Thử đổi camera hoặc mở lại app.' })}
       />
       <PoseOverlay key={selectedPose?.id ?? 'no-pose'} pose={selectedPose} />
 
@@ -120,6 +138,7 @@ export default function CameraScreen() {
         </View>
 
         <View style={[styles.dock, { paddingBottom: Math.max(insets.bottom, 12) + 10 }]}>
+          <ZoomIndicator key={facing} cameraRef={cameraRef} active={cameraReady} />
           {poses.length > 0 && (
             <PoseStrip
               poses={poses}
@@ -136,14 +155,13 @@ export default function CameraScreen() {
               <ThemedText type="small" style={styles.noticeText} numberOfLines={2}>{notice.text}</ThemedText>
             </Pressable>
           )}
-          <ZoomSelector levels={ZOOM_LEVELS} value={zoom} onChange={setZoom} />
           <CameraControls
             cameraReady={cameraReady}
             latestPhotoUri={latestPhotoUri}
             suggesting={suggesting}
             capturing={capturing}
             onOpenGallery={() => router.push('/gallery')}
-            onSuggest={() => cameraRef.current && void suggestions.suggest(cameraRef.current, facing)}
+            onSuggest={() => void suggestions.suggest(captureFrame, facing)}
             onCapture={() => void takePicture()}
             onFlip={() => {
               setCameraReady(false);
@@ -158,9 +176,9 @@ export default function CameraScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: palette.ink },
-  permission: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, gap: 18 },
+  centered: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, gap: 18 },
   brand: { color: palette.text, fontSize: 36, lineHeight: 42, letterSpacing: -1.2 },
-  permissionText: { color: palette.textMuted, textAlign: 'center' },
+  mutedText: { color: palette.textMuted, textAlign: 'center' },
   permissionButton: { paddingHorizontal: 22, paddingVertical: 13, borderRadius: 24, backgroundColor: '#0284C7' },
   permissionButtonText: { color: '#fff' },
   overlay: { ...StyleSheet.absoluteFill, justifyContent: 'space-between' },

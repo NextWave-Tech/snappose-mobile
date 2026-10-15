@@ -1,40 +1,47 @@
 import { Image } from 'expo-image';
+import { useEffect, useState, type RefObject } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
+import type { CameraRef } from 'react-native-vision-camera';
 
 import { ThemedText } from '@/components/themed-text';
 import { palette } from '@/constants/palette';
 
-export type ZoomLevel = { label: string; value: number };
+/** How often the zoom label re-reads the camera; the pinch gesture has no change event. */
+const ZOOM_POLL_MS = 150;
 
-export function ZoomSelector({
-  levels,
-  value,
-  onChange,
-}: {
-  levels: readonly ZoomLevel[];
-  value: number;
-  onChange: (value: number) => void;
-}) {
+function formatZoom(factor: number): string {
+  return `${Number(factor.toFixed(1))}x`;
+}
+
+/**
+ * Shows the current zoom (e.g. "0.5x", "1x", "2.3x") while the user pinches; tap to reset to 1x.
+ * It polls the camera controller itself so only this label re-renders, not the whole screen.
+ */
+export function ZoomIndicator({ cameraRef, active }: { cameraRef: RefObject<CameraRef | null>; active: boolean }) {
+  const [label, setLabel] = useState(formatZoom(1));
+
+  useEffect(() => {
+    if (!active) return;
+    const id = setInterval(() => {
+      const factor = cameraRef.current?.controller?.displayableZoomFactor;
+      if (factor != null) setLabel(formatZoom(factor));
+    }, ZOOM_POLL_MS);
+    return () => clearInterval(id);
+  }, [active, cameraRef]);
+
   return (
-    <View style={styles.zoomGroup}>
-      {levels.map((level) => {
-        const active = level.value === value;
-        return (
-          <Pressable
-            key={level.label}
-            accessibilityRole="button"
-            accessibilityLabel={`Zoom ${level.label}`}
-            accessibilityState={{ selected: active }}
-            onPress={() => onChange(level.value)}
-            style={[styles.zoomChip, active && styles.zoomChipActive]}
-          >
-            <ThemedText type="smallBold" style={[styles.zoomText, active && styles.zoomTextActive]}>
-              {level.label}
-            </ThemedText>
-          </Pressable>
-        );
-      })}
-    </View>
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`Zoom ${label}, chạm để về 1x`}
+      onPress={() => {
+        void cameraRef.current?.controller?.setZoom(1);
+        setLabel(formatZoom(1));
+      }}
+      hitSlop={8}
+      style={styles.zoomBadge}
+    >
+      <ThemedText type="smallBold" style={styles.zoomText}>{label}</ThemedText>
+    </Pressable>
   );
 }
 
@@ -116,18 +123,18 @@ export function CameraControls({
 const SIDE_BUTTON = 44;
 
 const styles = StyleSheet.create({
-  zoomGroup: {
-    flexDirection: 'row',
+  zoomBadge: {
     alignSelf: 'center',
-    padding: 3,
-    gap: 2,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: palette.inkGlass,
+    borderWidth: 1,
+    borderColor: palette.hairline,
   },
-  zoomChip: { minWidth: 40, alignItems: 'center', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 13 },
-  zoomChipActive: { backgroundColor: palette.sky },
-  zoomText: { color: palette.textMuted, fontSize: 12, lineHeight: 16 },
-  zoomTextActive: { color: palette.skyText },
+  zoomText: { color: palette.text, fontSize: 12, lineHeight: 16 },
   controls: {
     paddingHorizontal: 28,
     flexDirection: 'row',

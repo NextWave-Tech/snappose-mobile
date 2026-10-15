@@ -1,12 +1,7 @@
-import type { CameraType, CameraView } from 'expo-camera';
 import { Image } from 'expo-image';
-import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import { useCallback, useRef, useState } from 'react';
 
 import { resolveMediaUrl, suggestPoseBatch, type PoseMatch, type Scene } from '@/api/client';
-
-/** The frame sent to the AI only needs CLIP's input size; smaller means a faster upload. */
-const FRAME_WIDTH = 512;
 
 export type Notice = { tone: 'info' | 'error'; text: string };
 
@@ -17,16 +12,6 @@ type SuggestionState = {
 };
 
 const EMPTY_STATE: SuggestionState = { sceneId: undefined, gender: undefined, seenIds: [] };
-
-/** Grabs a throwaway frame for analysis; it is never saved or shown. */
-async function captureFrame(camera: CameraView): Promise<string> {
-  const frame = await camera.takePictureAsync({ quality: 0.5, shutterSound: false });
-  if (!frame?.uri) throw new Error('Không đọc được ảnh từ camera. Thử lại nhé.');
-  const image = await ImageManipulator.manipulate(frame.uri).resize({ width: FRAME_WIDTH }).renderAsync();
-  const { base64 } = await image.saveAsync({ base64: true, compress: 0.6, format: SaveFormat.JPEG });
-  if (!base64) throw new Error('Không đọc được ảnh từ camera. Thử lại nhé.');
-  return base64;
-}
 
 /**
  * AI pose suggestions, three at a time. Repeated calls in the same scene (and for the same
@@ -41,12 +26,13 @@ export function usePoseSuggestions(onNotice: (notice: Notice | null) => void) {
   const stateRef = useRef<SuggestionState>(EMPTY_STATE);
 
   const suggest = useCallback(
-    async (camera: CameraView, facing: CameraType) => {
+    /** `captureFrame` returns the current camera frame as base64 JPEG. */
+    async (captureFrame: () => Promise<string>, facing: 'front' | 'back') => {
       if (suggesting) return;
       setSuggesting(true);
       onNotice(null);
       try {
-        const frame = await captureFrame(camera);
+        const frame = await captureFrame();
         const batch = await suggestPoseBatch(frame, stateRef.current.seenIds, facing);
         if (batch.matches.length === 0) {
           onNotice({ tone: 'error', text: 'Chưa tìm được pose phù hợp. Thử ở nơi sáng hơn nhé.' });

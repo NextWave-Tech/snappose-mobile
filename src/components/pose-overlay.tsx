@@ -8,11 +8,20 @@ import { ThemedText } from '@/components/themed-text';
 const MIN_POSE_SCALE = 0.3;
 const MAX_POSE_SCALE = 2.5;
 const POSE_SCALE_STEP = 0.08;
-const OUTLINE_OFFSETS = [
-  [-0.55, 0],
-  [0.55, 0],
-  [0, -0.55],
-  [0, 0.55],
+// The skeleton PNGs are thin lines that vanish in bright light, so every copy is tinted:
+// dark halo copies sit behind (contrast on bright scenes), white copies offset by ~1px
+// thicken the line, and the original image is drawn last as pure white on top.
+const HALO_OFFSETS = [
+  [-2.2, 0],
+  [2.2, 0],
+  [0, -2.2],
+  [0, 2.2],
+] as const;
+const THICKEN_OFFSETS = [
+  [-0.9, 0],
+  [0.9, 0],
+  [0, -0.9],
+  [0, 0.9],
 ] as const;
 
 export function PoseOverlay({ pose }: { pose: PoseMatch | null }) {
@@ -35,17 +44,25 @@ export function PoseOverlay({ pose }: { pose: PoseMatch | null }) {
     <View pointerEvents="box-none" style={styles.overlay}>
       <View pointerEvents="none" style={styles.frame}>
         <View style={[styles.skeletonGroup, { transform: [{ scale: poseScale }] }]}>
-          {OUTLINE_OFFSETS.map(([translateX, translateY], index) => (
+          {HALO_OFFSETS.map(([translateX, translateY], index) => (
             <Image
-              key={`${pose.id}-outline-${index}`}
+              key={`${pose.id}-halo-${index}`}
               source={{ uri: imageUrl }}
               style={[
                 styles.skeleton,
-                {
-                  opacity: 0.48,
-                  transform: [{ translateX }, { translateY }],
-                },
+                { opacity: 0.55, transform: [{ translateX }, { translateY }] },
               ]}
+              tintColor="#000000"
+              contentFit="contain"
+              cachePolicy="disk"
+            />
+          ))}
+          {THICKEN_OFFSETS.map(([translateX, translateY], index) => (
+            <Image
+              key={`${pose.id}-thicken-${index}`}
+              source={{ uri: imageUrl }}
+              style={[styles.skeleton, { transform: [{ translateX }, { translateY }] }]}
+              tintColor="#FFFFFF"
               contentFit="contain"
               cachePolicy="disk"
             />
@@ -54,6 +71,7 @@ export function PoseOverlay({ pose }: { pose: PoseMatch | null }) {
             key={pose.id}
             source={{ uri: imageUrl }}
             style={styles.skeleton}
+            tintColor="#FFFFFF"
             contentFit="contain"
             transition={180}
             cachePolicy="disk"

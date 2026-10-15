@@ -5,7 +5,15 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 
-export function PhotoPreview({ uri, onRetake }: { uri: string; onRetake: () => void }) {
+export function PhotoPreview({
+  uri,
+  status,
+  onRetake,
+}: {
+  uri: string;
+  status?: string | null;
+  onRetake: () => void;
+}) {
   const [failed, setFailed] = useState(false);
 
   return (
@@ -40,7 +48,7 @@ export function PhotoPreview({ uri, onRetake }: { uri: string; onRetake: () => v
         </View>
 
         <View style={styles.footer}>
-          <ThemedText type="small" style={styles.hint}>Xem lại ảnh của bạn</ThemedText>
+          <ThemedText type="small" style={styles.hint}>{status ?? 'Xem lại ảnh của bạn'}</ThemedText>
         </View>
       </SafeAreaView>
     </View>

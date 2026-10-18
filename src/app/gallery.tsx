@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { FlatList, Pressable, StatusBar, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -14,15 +14,22 @@ const GAP = 2;
 
 export default function GalleryScreen() {
   const { width } = useWindowDimensions();
-  const [photos, setPhotos] = useState(listPhotos);
+  const [photos, setPhotos] = useState<string[]>([]);
+  const [loaded, setLoaded] = useState(false);
+  useEffect(() => {
+    void listPhotos({ ask: true }).then((list) => {
+      setPhotos(list);
+      setLoaded(true);
+    });
+  }, []);
   const [openIndex, setOpenIndex] = useState<number | null>(null);
   // Bumped whenever the list changes so the viewer remounts on the right photo.
   const [viewerKey, setViewerKey] = useState(0);
   const closeViewer = useCallback(() => setOpenIndex(null), []);
   const size = (width - GAP * (COLUMNS - 1)) / COLUMNS;
 
-  const onPhotosChanged = useCallback(({ focusUri, fallbackIndex }: PhotosChange) => {
-    const next = listPhotos();
+  const onPhotosChanged = useCallback(async ({ focusUri, fallbackIndex }: PhotosChange) => {
+    const next = await listPhotos();
     setPhotos(next);
     setViewerKey((key) => key + 1);
     if (next.length === 0) return setOpenIndex(null);
@@ -59,7 +66,7 @@ export default function GalleryScreen() {
         <ThemedText type="small" style={styles.count}>{photos.length} ảnh</ThemedText>
       </View>
 
-      {photos.length === 0 ? (
+      {!loaded ? null : photos.length === 0 ? (
         <View style={styles.empty}>
           <ThemedText style={styles.emptyText}>Chưa có ảnh nào. Chụp ảnh đầu tiên để lưu ở đây.</ThemedText>
         </View>

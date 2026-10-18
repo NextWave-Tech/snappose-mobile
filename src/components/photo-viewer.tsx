@@ -102,14 +102,13 @@ export function PhotoViewer({ photos, initialIndex, onClose, onPhotosChanged }: 
 
   const confirmDelete = () => {
     setMenuOpen(false);
-    Alert.alert('Xóa ảnh này?', 'Ảnh sẽ bị xóa khỏi bộ sưu tập SnapPose.', [
+    Alert.alert('Xóa ảnh này?', 'Ảnh sẽ bị xóa khỏi bộ sưu tập SnapPose và thư viện ảnh của máy.', [
       { text: 'Hủy', style: 'cancel' },
       {
         text: 'Xóa ảnh',
         style: 'destructive',
-        onPress: () => {
-          deletePhoto(uri);
-          onPhotosChanged({ fallbackIndex: index });
+        onPress: async () => {
+          if (await deletePhoto(uri)) onPhotosChanged({ fallbackIndex: index });
         },
       },
     ]);

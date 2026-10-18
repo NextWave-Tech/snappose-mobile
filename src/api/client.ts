@@ -42,7 +42,7 @@ export type PoseBatch = {
 async function postJson<T>(endpoint: string, body: Record<string, unknown>): Promise<T> {
   if (!API_BASE_URL) {
     throw new Error(
-      'EXPO_PUBLIC_API_URL is not set — put your ngrok URL in .env, see plan/02-repo-and-env-setup.md',
+      'EXPO_PUBLIC_API_URL is not set — put the backend tunnel URL in .env, see RUN_LOCAL.md',
     );
   }
 
@@ -75,4 +75,18 @@ export function suggestPoseBatch(
     exclude_ids: excludeIds,
     facing,
   });
+}
+
+export type AppUser = {
+  id: number;
+  email: string;
+  name: string | null;
+  avatar_url: string | null;
+};
+
+export type AuthSession = { access_token: string; user: AppUser };
+
+/** Trades a Google ID token for a SnapPose session; the server creates the user on first login. */
+export function loginWithGoogle(idToken: string): Promise<AuthSession> {
+  return postJson<AuthSession>('auth/google', { id_token: idToken });
 }

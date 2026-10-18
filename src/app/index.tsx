@@ -27,6 +27,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Upright } from '@/components/upright';
 import { ZoomControl } from '@/components/zoom-dial';
 import { palette } from '@/constants/palette';
+import { useAuth } from '@/auth/auth-context';
 import { usePoseSuggestions, type Notice } from '@/hooks/use-pose-suggestions';
 import { listPhotos, savePhoto } from '@/storage/photos';
 
@@ -96,6 +97,7 @@ export default function CameraScreen() {
   const insets = useSafeAreaInsets();
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const suggestions = usePoseSuggestions(setNotice);
+  const { user } = useAuth();
 
   useFocusEffect(
     useCallback(() => {
@@ -329,8 +331,10 @@ export default function CameraScreen() {
           latestPhotoUri={latestPhotoUri}
           capturing={capturing}
           countingDown={countdown !== null}
+          avatarUri={user?.avatar_url ?? null}
           onOpenGallery={() => router.push('/gallery')}
           onCapture={onShutter}
+          onOpenSettings={() => router.push('/settings')}
         />
       </View>
       {screenFlashOn && <View pointerEvents="none" style={styles.screenFlash} />}
@@ -373,7 +377,7 @@ const styles = StyleSheet.create({
     textShadowRadius: 12,
   },
   frameBottom: { gap: 8 },
-  controlsArea: { flex: 1, width: '100%', justifyContent: 'flex-end', gap: 26, paddingBottom: 6 },
+  controlsArea: { flex: 1, width: '100%', justifyContent: 'flex-end', gap: 22, paddingBottom: 18 },
   notice: {
     alignSelf: 'center',
     maxWidth: '95%',

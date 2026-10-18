@@ -1,7 +1,6 @@
 /** Colors for the camera UI, which is always dark regardless of the system theme. */
 export const palette = {
   ink: '#060E1A',
-  inkGlass: 'rgba(6,14,26,0.64)',
   sky: '#38BDF8',
   skyText: '#06202F',
   pink: '#F472B6',

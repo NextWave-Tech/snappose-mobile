@@ -1,0 +1,19 @@
+diff --git a/node_modules/@expo/ui/android/src/main/java/expo/modules/ui/ExpoUIModule.kt b/node_modules/@expo/ui/android/src/main/java/expo/modules/ui/ExpoUIModule.kt
+index f7f0d1b..4f0234f 100644
+--- a/node_modules/@expo/ui/android/src/main/java/expo/modules/ui/ExpoUIModule.kt
++++ b/node_modules/@expo/ui/android/src/main/java/expo/modules/ui/ExpoUIModule.kt
+@@ -76,7 +76,13 @@ class ExpoUIModule : Module() {
+       // `RNHostView` publishes its content origin into a process-global registry keyed by view tag.
+       // Tags restart in the next app context, so an entry whose view was never torn down would be
+       // read by an unrelated view after a reload.
+-      NativeStatePropsGetter().clearAllContentOrigins()
++      // patch-package (SnapPose): when expo-dev-client swaps its launcher for the app, the launcher's
++      // React instance is torn down before expo-modules-core's JNI library is loaded, and this
++      // call threw UnsatisfiedLinkError and crashed the app. Nothing was registered then anyway.
++      try {
++        NativeStatePropsGetter().clearAllContentOrigins()
++      } catch (_: UnsatisfiedLinkError) {
++      }
+ 
+       imageLoader?.close()
+       imageLoader = null

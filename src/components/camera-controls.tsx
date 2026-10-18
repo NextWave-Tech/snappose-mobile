@@ -115,21 +115,26 @@ type ControlsProps = {
   rotation: number;
   cameraReady: boolean;
   latestPhotoUri: string | null;
+  /** The signed-in user's avatar, shown on the settings button. */
+  avatarUri: string | null;
   capturing: boolean;
   countingDown: boolean;
   onOpenGallery: () => void;
   onCapture: () => void;
+  onOpenSettings: () => void;
 };
 
-/** Bottom row: latest photo (opens the gallery) and the shutter, centered. */
+/** Bottom row: latest photo (opens the gallery), the shutter, and settings (account). */
 export function CameraControls({
   rotation,
   cameraReady,
   latestPhotoUri,
+  avatarUri,
   capturing,
   countingDown,
   onOpenGallery,
   onCapture,
+  onOpenSettings,
 }: ControlsProps) {
   return (
     <View style={styles.controls}>
@@ -160,8 +165,25 @@ export function CameraControls({
         <View style={[styles.shutterInner, capturing && styles.shutterPressed, countingDown && styles.shutterCounting]} />
       </Pressable>
 
-      {/* Keeps the shutter centered. */}
-      <View style={styles.sideSlot} />
+      <View style={styles.sideSlot}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Cài đặt và tài khoản"
+          onPress={onOpenSettings}
+          hitSlop={8}
+          style={styles.settingsButton}
+        >
+          <Upright rotation={rotation} style={styles.fill}>
+            {avatarUri ? (
+              <Image source={{ uri: avatarUri }} style={styles.fill} contentFit="cover" />
+            ) : (
+              <View style={styles.galleryEmpty}>
+                <Ionicons name="settings-outline" size={24} color="#fff" />
+              </View>
+            )}
+          </Upright>
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -196,26 +218,33 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: 'rgba(255,255,255,0.08)',
   },
-  sideSlot: { width: SIDE_BUTTON, height: SIDE_BUTTON },
+  sideSlot: { width: SIDE_BUTTON, height: SIDE_BUTTON, alignItems: 'center', justifyContent: 'center' },
+  settingsButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(255,255,255,0.12)',
+  },
   fill: { width: '100%', height: '100%' },
   shutter: {
-    width: 78,
-    height: 78,
-    borderRadius: 39,
+    width: 68,
+    height: 68,
+    borderRadius: 34,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 4,
+    borderWidth: 3.5,
     borderColor: '#fff',
   },
   shutterInner: {
-    width: 62,
-    height: 62,
-    borderRadius: 31,
+    width: 54,
+    height: 54,
+    borderRadius: 27,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#fff',
   },
-  shutterPressed: { width: 54, height: 54, borderRadius: 27 },
+  shutterPressed: { width: 46, height: 46, borderRadius: 23 },
   shutterCounting: { width: 30, height: 30, borderRadius: 8, backgroundColor: palette.danger },
   disabled: { opacity: 0.4 },
 });

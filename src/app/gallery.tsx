@@ -62,8 +62,11 @@ export default function GalleryScreen() {
         >
           <ThemedText type="smallBold" style={styles.backText}>‹ Camera</ThemedText>
         </Pressable>
-        <ThemedText type="smallBold" style={styles.title}>Bộ sưu tập</ThemedText>
-        <ThemedText type="small" style={styles.count}>{photos.length} ảnh</ThemedText>
+        <View style={styles.titleBlock}>
+          <ThemedText type="smallBold" style={styles.title}>Bộ sưu tập</ThemedText>
+          <ThemedText type="small" style={styles.count}>{photos.length} ảnh</ThemedText>
+        </View>
+        <View style={styles.headerSide} />
       </View>
 
       {!loaded ? null : photos.length === 0 ? (
@@ -104,8 +107,10 @@ const styles = StyleSheet.create({
   },
   backButton: { minWidth: 80, paddingVertical: 10 },
   backText: { color: palette.text },
+  titleBlock: { alignItems: 'center' },
   title: { color: palette.text, fontSize: 16, lineHeight: 20 },
-  count: { minWidth: 80, textAlign: 'right', color: palette.textMuted, fontSize: 12 },
+  count: { color: palette.textMuted, fontSize: 12, lineHeight: 16 },
+  headerSide: { minWidth: 80, alignItems: 'flex-end' },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
   emptyText: { color: palette.textMuted, textAlign: 'center' },
 });

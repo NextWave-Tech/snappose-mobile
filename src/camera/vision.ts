@@ -17,10 +17,13 @@ export function toFileUri(path: string): string {
 /**
  * Grabs the current preview frame as base64 JPEG for the AI. A preview snapshot doesn't run a
  * photo capture, so the preview never freezes or flashes the way a silent takePicture did.
+ * The snapshot follows the portrait-locked screen; `uiRotation` (the camera's UI rotation) turns
+ * it back upright when the phone is held sideways, so the AI sees the scene the right way up.
  */
-export async function captureFrameBase64(camera: CameraRef): Promise<string> {
+export async function captureFrameBase64(camera: CameraRef, uiRotation = 0): Promise<string> {
   if (!camera.preview) throw new Error('Camera chưa sẵn sàng. Thử lại nhé.');
-  const snapshot = await camera.preview.takeSnapshot();
+  const preview = await camera.preview.takeSnapshot();
+  const snapshot = uiRotation % 360 === 0 ? preview : await preview.rotateAsync(-uiRotation);
   const height = Math.round((FRAME_WIDTH * snapshot.height) / snapshot.width);
   const small = await snapshot.resizeAsync(FRAME_WIDTH, height);
   const path = await small.saveToTemporaryFileAsync('jpg', 60);
